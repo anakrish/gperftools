@@ -84,46 +84,51 @@ Atomic32 SpinLock::SpinLoop() {
                                               kSpinLockSleeper);
 }
 
-void SpinLock::SlowLock() {
-  Atomic32 lock_value = SpinLoop();
+void SpinLock::SlowLock()
+{
+    Atomic32 lock_value = SpinLoop();
 
-  int lock_wait_call_count = 0;
-  while (lock_value != kSpinLockFree) {
-    // If the lock is currently held, but not marked as having a sleeper, mark
-    // it as having a sleeper.
-    if (lock_value == kSpinLockHeld) {
-      // Here, just "mark" that the thread is going to sleep.  Don't store the
-      // lock wait time in the lock as that will cause the current lock
-      // owner to think it experienced contention.
-      lock_value = base::subtle::Acquire_CompareAndSwap(&lockword_,
-                                                        kSpinLockHeld,
-                                                        kSpinLockSleeper);
-      if (lock_value == kSpinLockHeld) {
-        // Successfully transitioned to kSpinLockSleeper.  Pass
-        // kSpinLockSleeper to the SpinLockDelay routine to properly indicate
-        // the last lock_value observed.
-        lock_value = kSpinLockSleeper;
-      } else if (lock_value == kSpinLockFree) {
-        // Lock is free again, so try and acquire it before sleeping.  The
-        // new lock state will be the number of cycles this thread waited if
-        // this thread obtains the lock.
-        lock_value = base::subtle::Acquire_CompareAndSwap(&lockword_,
-                                                          kSpinLockFree,
-                                                          kSpinLockSleeper);
-        continue;  // skip the delay at the end of the loop
-      }
+    // int lock_wait_call_count = 0;
+    while (lock_value != kSpinLockFree)
+    {
+        // If the lock is currently held, but not marked as having a sleeper,
+        // mark it as having a sleeper.
+        if (lock_value == kSpinLockHeld)
+        {
+            // Here, just "mark" that the thread is going to sleep.  Don't store
+            // the lock wait time in the lock as that will cause the current
+            // lock owner to think it experienced contention.
+            lock_value = base::subtle::Acquire_CompareAndSwap(
+                &lockword_, kSpinLockHeld, kSpinLockSleeper);
+            if (lock_value == kSpinLockHeld)
+            {
+                // Successfully transitioned to kSpinLockSleeper.  Pass
+                // kSpinLockSleeper to the SpinLockDelay routine to properly
+                // indicate the last lock_value observed.
+                lock_value = kSpinLockSleeper;
+            }
+            else if (lock_value == kSpinLockFree)
+            {
+                // Lock is free again, so try and acquire it before sleeping.
+                // The new lock state will be the number of cycles this thread
+                // waited if this thread obtains the lock.
+                lock_value = base::subtle::Acquire_CompareAndSwap(
+                    &lockword_, kSpinLockFree, kSpinLockSleeper);
+                continue; // skip the delay at the end of the loop
+            }
+        }
+
+        // Wait for an OS specific delay.
+        //        base::internal::SpinLockDelay(
+        //            &lockword_, lock_value, ++lock_wait_call_count);
+        // Spin again after returning from the wait routine to give this thread
+        // some chance of obtaining the lock.
+        lock_value = SpinLoop();
     }
-
-    // Wait for an OS specific delay.
-    base::internal::SpinLockDelay(&lockword_, lock_value,
-                                  ++lock_wait_call_count);
-    // Spin again after returning from the wait routine to give this thread
-    // some chance of obtaining the lock.
-    lock_value = SpinLoop();
-  }
 }
 
-void SpinLock::SlowUnlock() {
-  // wake waiter if necessary
-  base::internal::SpinLockWake(&lockword_, false);
+void SpinLock::SlowUnlock()
+{
+    // wake waiter if necessary
+    // base::internal::SpinLockWake(&lockword_, false);
 }

@@ -90,7 +90,9 @@ static void ReplaceSystemAlloc() { PatchWindowsFunctions(); }
 // ones I know of do, so for now just assume they all do.
 #elif defined(__GNUC__)
 #include "libc_override_gcc_and_weak.h"
-
+// static void ReplaceSystemAlloc()
+//{
+//}
 #else
 #error Need to add support for your libc/OS here
 

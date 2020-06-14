@@ -165,13 +165,16 @@ int perftools_pthread_once(pthread_once_t *ctl,
 
 #ifdef HAVE_FORK
 
-void perftools_pthread_atfork(void (*before)(),
-                              void (*parent_after)(),
-                              void (*child_after)()) {
-  if (pthread_atfork) {
-    int rv = pthread_atfork(before, parent_after, child_after);
-    CHECK(rv == 0);
-  }
+void perftools_pthread_atfork(
+    void (*before)(),
+    void (*parent_after)(),
+    void (*child_after)())
+{
+    abort();
+    //  if (pthread_atfork) {
+    //    int rv = pthread_atfork(before, parent_after, child_after);
+    //   CHECK(rv == 0);
+    // }
 }
 
 #endif

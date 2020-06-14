@@ -1,11 +1,11 @@
 // -*- Mode: C++; c-basic-offset: 2; indent-tabs-mode: nil -*-
 // Copyright (c) 2005, Google Inc.
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
-// 
+//
 //     * Redistributions of source code must retain the above copyright
 // notice, this list of conditions and the following disclaimer.
 //     * Redistributions in binary form must reproduce the above
@@ -15,7 +15,7 @@
 //     * Neither the name of Google Inc. nor the names of its
 // contributors may be used to endorse or promote products derived from
 // this software without specific prior written permission.
-// 
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -31,10 +31,10 @@
 // ---
 // Author: Sanjay Ghemawat <opensource@google.com>
 
-#include <config.h>
 #include <assert.h>
-#include <string.h>
+#include <config.h>
 #include <stdio.h>
+#include <string.h>
 #if defined HAVE_STDINT_H
 #include <stdint.h>
 #elif defined HAVE_INTTYPES_H
@@ -44,19 +44,21 @@
 #endif
 #include <string>
 #include "base/dynamic_annotations.h"
-#include "base/sysinfo.h"    // for FillProcSelfMaps
+#include "base/sysinfo.h" // for FillProcSelfMaps
 #ifndef NO_HEAP_CHECK
 #include "gperftools/heap-checker.h"
 #endif
+#include "base/googleinit.h"
 #include "gperftools/malloc_extension.h"
 #include "gperftools/malloc_extension_c.h"
 #include "maybe_threads.h"
-#include "base/googleinit.h"
 
 using STL_NAMESPACE::string;
 using STL_NAMESPACE::vector;
 
-static void DumpAddressMap(string* result) {
+#if 0
+static void DumpAddressMap(string* result)
+{
   *result += "\nMAPPED_LIBRARIES:\n";
   // We keep doubling until we get a fit
   const size_t old_resultlen = result->size();
@@ -74,34 +76,37 @@ static void DumpAddressMap(string* result) {
   }
   result->reserve(old_resultlen);   // just don't print anything
 }
+#endif
 
 // Note: this routine is meant to be called before threads are spawned.
-void MallocExtension::Initialize() {
-  static bool initialize_called = false;
+void MallocExtension::Initialize()
+{
+    static bool initialize_called = false;
 
-  if (initialize_called) return;
-  initialize_called = true;
+    if (initialize_called)
+        return;
+    initialize_called = true;
 
 #ifdef __GLIBC__
-  // GNU libc++ versions 3.3 and 3.4 obey the environment variables
-  // GLIBCPP_FORCE_NEW and GLIBCXX_FORCE_NEW respectively.  Setting
-  // one of these variables forces the STL default allocator to call
-  // new() or delete() for each allocation or deletion.  Otherwise
-  // the STL allocator tries to avoid the high cost of doing
-  // allocations by pooling memory internally.  However, tcmalloc
-  // does allocations really fast, especially for the types of small
-  // items one sees in STL, so it's better off just using us.
-  // TODO: control whether we do this via an environment variable?
-  setenv("GLIBCPP_FORCE_NEW", "1", false /* no overwrite*/);
-  setenv("GLIBCXX_FORCE_NEW", "1", false /* no overwrite*/);
+    // GNU libc++ versions 3.3 and 3.4 obey the environment variables
+    // GLIBCPP_FORCE_NEW and GLIBCXX_FORCE_NEW respectively.  Setting
+    // one of these variables forces the STL default allocator to call
+    // new() or delete() for each allocation or deletion.  Otherwise
+    // the STL allocator tries to avoid the high cost of doing
+    // allocations by pooling memory internally.  However, tcmalloc
+    // does allocations really fast, especially for the types of small
+    // items one sees in STL, so it's better off just using us.
+    // TODO: control whether we do this via an environment variable?
+    setenv("GLIBCPP_FORCE_NEW", "1", false /* no overwrite*/);
+    setenv("GLIBCXX_FORCE_NEW", "1", false /* no overwrite*/);
 
-  // Now we need to make the setenv 'stick', which it may not do since
-  // the env is flakey before main() is called.  But luckily stl only
-  // looks at this env var the first time it tries to do an alloc, and
-  // caches what it finds.  So we just cause an stl alloc here.
-  string dummy("I need to be allocated");
-  dummy += "!";         // so the definition of dummy isn't optimized out
-#endif  /* __GLIBC__ */
+    // Now we need to make the setenv 'stick', which it may not do since
+    // the env is flakey before main() is called.  But luckily stl only
+    // looks at this env var the first time it tries to do an alloc, and
+    // caches what it finds.  So we just cause an stl alloc here.
+    string dummy("I need to be allocated");
+    dummy += "!"; // so the definition of dummy isn't optimized out
+#endif            /* __GLIBC__ */
 }
 
 // SysAllocator implementation
@@ -297,7 +302,9 @@ void PrintStackEntry(MallocExtensionWriter* writer, void** entry) {
 
 }
 
-void MallocExtension::GetHeapSample(MallocExtensionWriter* writer) {
+void MallocExtension::GetHeapSample(MallocExtensionWriter* writer)
+{
+#if 0
   int sample_period = 0;
   void** entries = ReadStackTraces(&sample_period);
   if (entries == NULL) {
@@ -319,9 +326,12 @@ void MallocExtension::GetHeapSample(MallocExtensionWriter* writer) {
   delete[] entries;
 
   DumpAddressMap(writer);
+#endif
 }
 
-void MallocExtension::GetHeapGrowthStacks(MallocExtensionWriter* writer) {
+void MallocExtension::GetHeapGrowthStacks(MallocExtensionWriter* writer)
+{
+#if 0
   void** entries = ReadHeapGrowthStackTraces();
   if (entries == NULL) {
     const char* const kErrorMsg =
@@ -343,6 +353,7 @@ void MallocExtension::GetHeapGrowthStacks(MallocExtensionWriter* writer) {
   delete[] entries;
 
   DumpAddressMap(writer);
+#endif
 }
 
 void MallocExtension::Ranges(void* arg, RangeFunction func) {

@@ -93,7 +93,7 @@
 #define PERFTOOLS_NOTHROW
 #include <gperftools/tcmalloc.h>
 
-#include <errno.h>                      // for ENOMEM, EINVAL, errno
+#include <errno.h> // for ENOMEM, EINVAL, errno
 #if defined HAVE_STDINT_H
 #include <stdint.h>
 #elif defined HAVE_INTTYPES_H
@@ -101,42 +101,43 @@
 #else
 #include <sys/types.h>
 #endif
-#include <stddef.h>                     // for size_t, NULL
-#include <stdlib.h>                     // for getenv
-#include <string.h>                     // for strcmp, memset, strlen, etc
+#include <stddef.h> // for size_t, NULL
+#include <stdlib.h> // for getenv
+#include <string.h> // for strcmp, memset, strlen, etc
 #ifdef HAVE_UNISTD_H
-#include <unistd.h>                     // for getpagesize, write, etc
+#include <unistd.h> // for getpagesize, write, etc
 #endif
-#include <algorithm>                    // for max, min
-#include <limits>                       // for numeric_limits
-#include <new>                          // for nothrow_t (ptr only), etc
-#include <vector>                       // for vector
+#include <algorithm> // for max, min
+#include <limits>    // for numeric_limits
+#include <new>       // for nothrow_t (ptr only), etc
+#include <vector>    // for vector
 
 #include <gperftools/malloc_extension.h>
-#include <gperftools/malloc_hook.h>         // for MallocHook
+#include <gperftools/malloc_hook.h> // for MallocHook
 #include <gperftools/nallocx.h>
-#include "base/basictypes.h"            // for int64
-#include "base/commandlineflags.h"      // for RegisterFlagValidator, etc
-#include "base/dynamic_annotations.h"   // for RunningOnValgrind
-#include "base/spinlock.h"              // for SpinLockHolder
-#include "central_freelist.h"  // for CentralFreeListPadded
-#include "common.h"            // for StackTrace, kPageShift, etc
-#include "internal_logging.h"  // for ASSERT, TCMalloc_Printer, etc
-#include "linked_list.h"       // for SLL_SetNext
-#include "malloc_hook-inl.h"       // for MallocHook::InvokeNewHook, etc
-#include "page_heap.h"         // for PageHeap, PageHeap::Stats
-#include "page_heap_allocator.h"  // for PageHeapAllocator
-#include "span.h"              // for Span, DLL_Prepend, etc
-#include "stack_trace_table.h"  // for StackTraceTable
-#include "static_vars.h"       // for Static
-#include "system-alloc.h"      // for DumpSystemAllocatorStats, etc
-#include "tcmalloc_guard.h"    // for TCMallocGuard
-#include "thread_cache.h"      // for ThreadCache
+#include "base/basictypes.h"          // for int64
+#include "base/commandlineflags.h"    // for RegisterFlagValidator, etc
+#include "base/dynamic_annotations.h" // for RunningOnValgrind
+#include "base/spinlock.h"            // for SpinLockHolder
+#include "central_freelist.h"         // for CentralFreeListPadded
+#include "common.h"                   // for StackTrace, kPageShift, etc
+#include "internal_logging.h"         // for ASSERT, TCMalloc_Printer, etc
+#include "linked_list.h"              // for SLL_SetNext
+#include "malloc_hook-inl.h"          // for MallocHook::InvokeNewHook, etc
+#include "page_heap.h"                // for PageHeap, PageHeap::Stats
+#include "page_heap_allocator.h"      // for PageHeapAllocator
+#include "span.h"                     // for Span, DLL_Prepend, etc
+#include "stack_trace_table.h"        // for StackTraceTable
+#include "static_vars.h"              // for Static
+#include "system-alloc.h"             // for DumpSystemAllocatorStats, etc
+#include "tcmalloc_guard.h"           // for TCMallocGuard
+#include "thread_cache.h"             // for ThreadCache
 
 #include "maybe_emergency_malloc.h"
 
-#if (defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)) && !defined(WIN32_OVERRIDE_ALLOCATORS)
-# define WIN32_DO_PATCHING 1
+#if (defined(_WIN32) && !defined(__CYGWIN__) && !defined(__CYGWIN32__)) && \
+    !defined(WIN32_OVERRIDE_ALLOCATORS)
+#define WIN32_DO_PATCHING 1
 #endif
 
 // Some windows file somewhere (at least on cygwin) #define's small (!)
@@ -150,9 +151,9 @@ using STL_NAMESPACE::vector;
 #include "libc_override.h"
 
 using tcmalloc::AlignmentForSize;
-using tcmalloc::kLog;
 using tcmalloc::kCrash;
 using tcmalloc::kCrashWithStats;
+using tcmalloc::kLog;
 using tcmalloc::Log;
 using tcmalloc::PageHeap;
 using tcmalloc::PageHeapAllocator;
@@ -175,9 +176,9 @@ DECLARE_double(tcmalloc_release_rate);
 // 5+ optimization for merging identical functions kicked in and
 // "screwed" one of the otherwise identical functions with extra
 // jump. I am not able to reproduce that anymore.
-#if !defined(__i386__) && !defined(__x86_64__) && \
-    !defined(__ppc__) && !defined(__PPC__) && \
-    !defined(__aarch64__) && !defined(__mips__) && !defined(__arm__)
+#if !defined(__i386__) && !defined(__x86_64__) && !defined(__ppc__) &&  \
+    !defined(__PPC__) && !defined(__aarch64__) && !defined(__mips__) && \
+    !defined(__arm__)
 #undef TCMALLOC_NO_ALIASES
 #define TCMALLOC_NO_ALIASES
 #endif
@@ -197,122 +198,131 @@ const int64 kDefaultLargeAllocReportThreshold = static_cast<int64>(1) << 62;
 #else
 const int64 kDefaultLargeAllocReportThreshold = static_cast<int64>(1) << 30;
 #endif
-DEFINE_int64(tcmalloc_large_alloc_report_threshold,
-             EnvToInt64("TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD",
-                        kDefaultLargeAllocReportThreshold),
-             "Allocations larger than this value cause a stack "
-             "trace to be dumped to stderr.  The threshold for "
-             "dumping stack traces is increased by a factor of 1.125 "
-             "every time we print a message so that the threshold "
-             "automatically goes up by a factor of ~1000 every 60 "
-             "messages.  This bounds the amount of extra logging "
-             "generated by this flag.  Default value of this flag "
-             "is very large and therefore you should see no extra "
-             "logging unless the flag is overridden.  Set to 0 to "
-             "disable reporting entirely.");
-
+DEFINE_int64(
+    tcmalloc_large_alloc_report_threshold,
+    EnvToInt64(
+        "TCMALLOC_LARGE_ALLOC_REPORT_THRESHOLD",
+        kDefaultLargeAllocReportThreshold),
+    "Allocations larger than this value cause a stack "
+    "trace to be dumped to stderr.  The threshold for "
+    "dumping stack traces is increased by a factor of 1.125 "
+    "every time we print a message so that the threshold "
+    "automatically goes up by a factor of ~1000 every 60 "
+    "messages.  This bounds the amount of extra logging "
+    "generated by this flag.  Default value of this flag "
+    "is very large and therefore you should see no extra "
+    "logging unless the flag is overridden.  Set to 0 to "
+    "disable reporting entirely.");
 
 // We already declared these functions in tcmalloc.h, but we have to
 // declare them again to give them an ATTRIBUTE_SECTION: we want to
 // put all callers of MallocHook::Invoke* in this module into
 // ATTRIBUTE_SECTION(google_malloc) section, so that
 // MallocHook::GetCallerStackTrace can function accurately.
-#ifndef _WIN32   // windows doesn't have attribute_section, so don't bother
-extern "C" {
-  void* tc_malloc(size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_free(void* ptr) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_free_sized(void* ptr, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_realloc(void* ptr, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_calloc(size_t nmemb, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_cfree(void* ptr) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+#ifndef _WIN32 // windows doesn't have attribute_section, so don't bother
+extern "C"
+{
+    void* tc_malloc(size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_free(void* ptr) PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
+    void tc_free_sized(void* ptr, size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_realloc(void* ptr, size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_calloc(size_t nmemb, size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_cfree(void* ptr) PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
 
-  void* tc_memalign(size_t __alignment, size_t __size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  int tc_posix_memalign(void** ptr, size_t align, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_valloc(size_t __size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_pvalloc(size_t __size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    void* tc_memalign(size_t __alignment, size_t __size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    int tc_posix_memalign(void** ptr, size_t align, size_t size)
+        PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
+    void* tc_valloc(size_t __size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_pvalloc(size_t __size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
 
-  void tc_malloc_stats(void) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  int tc_mallopt(int cmd, int value) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    void tc_malloc_stats(void) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    int tc_mallopt(int cmd, int value) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
 #ifdef HAVE_STRUCT_MALLINFO
-  struct mallinfo tc_mallinfo(void) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    struct mallinfo tc_mallinfo(void) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
 #endif
 
-  void* tc_new(size_t size)
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_delete(void* p) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_delete_sized(void* p, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_newarray(size_t size)
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray(void* p) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray_sized(void* p, size_t size) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    void* tc_new(size_t size) ATTRIBUTE_SECTION(google_malloc);
+    void tc_delete(void* p) PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
+    void tc_delete_sized(void* p, size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_newarray(size_t size) ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray(void* p) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray_sized(void* p, size_t size) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
 
-  // And the nothrow variants of these:
-  void* tc_new_nothrow(size_t size, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_newarray_nothrow(size_t size, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  // Surprisingly, standard C++ library implementations use a
-  // nothrow-delete internally.  See, eg:
-  // http://www.dinkumware.com/manuals/?manual=compleat&page=new.html
-  void tc_delete_nothrow(void* ptr, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray_nothrow(void* ptr, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    // And the nothrow variants of these:
+    void* tc_new_nothrow(size_t size, const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_newarray_nothrow(size_t size, const std::nothrow_t&)
+        PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
+    // Surprisingly, standard C++ library implementations use a
+    // nothrow-delete internally.  See, eg:
+    // http://www.dinkumware.com/manuals/?manual=compleat&page=new.html
+    void tc_delete_nothrow(void* ptr, const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray_nothrow(void* ptr, const std::nothrow_t&)
+        PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
 
 #if defined(ENABLE_ALIGNED_NEW_DELETE)
 
-  void* tc_new_aligned(size_t size, std::align_val_t al)
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_delete_aligned(void* p, std::align_val_t al) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_delete_sized_aligned(void* p, size_t size, std::align_val_t al) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_newarray_aligned(size_t size, std::align_val_t al)
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray_aligned(void* p, std::align_val_t al) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray_sized_aligned(void* p, size_t size, std::align_val_t al) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    void* tc_new_aligned(size_t size, std::align_val_t al)
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_delete_aligned(void* p, std::align_val_t al) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_delete_sized_aligned(void* p, size_t size, std::align_val_t al)
+        PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
+    void* tc_newarray_aligned(size_t size, std::align_val_t al)
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray_aligned(void* p, std::align_val_t al) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray_sized_aligned(void* p, size_t size, std::align_val_t al)
+        PERFTOOLS_NOTHROW ATTRIBUTE_SECTION(google_malloc);
 
-  // And the nothrow variants of these:
-  void* tc_new_aligned_nothrow(size_t size, std::align_val_t al, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void* tc_newarray_aligned_nothrow(size_t size, std::align_val_t al, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_delete_aligned_nothrow(void* ptr, std::align_val_t al, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-  void tc_deletearray_aligned_nothrow(void* ptr, std::align_val_t al, const std::nothrow_t&) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
+    // And the nothrow variants of these:
+    void* tc_new_aligned_nothrow(
+        size_t size,
+        std::align_val_t al,
+        const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void* tc_newarray_aligned_nothrow(
+        size_t size,
+        std::align_val_t al,
+        const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_delete_aligned_nothrow(
+        void* ptr,
+        std::align_val_t al,
+        const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+    void tc_deletearray_aligned_nothrow(
+        void* ptr,
+        std::align_val_t al,
+        const std::nothrow_t&) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
 
 #endif // defined(ENABLE_ALIGNED_NEW_DELETE)
 
-  // Some non-standard extensions that we support.
+    // Some non-standard extensions that we support.
 
-  // This is equivalent to
-  //    OS X: malloc_size()
-  //    glibc: malloc_usable_size()
-  //    Windows: _msize()
-  size_t tc_malloc_size(void* p) PERFTOOLS_NOTHROW
-      ATTRIBUTE_SECTION(google_malloc);
-}  // extern "C"
-#endif  // #ifndef _WIN32
+    // This is equivalent to
+    //    OS X: malloc_size()
+    //    glibc: malloc_usable_size()
+    //    Windows: _msize()
+    size_t tc_malloc_size(void* p) PERFTOOLS_NOTHROW
+        ATTRIBUTE_SECTION(google_malloc);
+} // extern "C"
+#endif // #ifndef _WIN32
 
 // ----------------------- IMPLEMENTATION -------------------------------
 
